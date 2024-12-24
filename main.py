@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from lll import LLL_reduction as RED
+import torch
 
 def ORTH(B):
     return np.linalg.cholesky(B @ B.T)
