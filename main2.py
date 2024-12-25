@@ -1,11 +1,13 @@
 import numpy as np
 from tqdm import tqdm
 from lll import LLL_reduction as RED
-from chol_diff import chol_rev
 
 def ORTH(B):
     return np.linalg.cholesky(B @ B.T)
-
+"""
+def RED(B):
+    return B
+"""
 def URAN(n):
     return np.random.randn(n)
 def GRAN(n, m):
@@ -64,81 +66,27 @@ def det(B):
 
 
 Tr = 1
-T = Tr * 1000000
+T = Tr * 100000
 mu0 = 0.001
 v = 500
 n = 2
 
-I = np.eye(n)
-I_swapped = I.copy() 
-I_swapped[[0, 1]] = I_swapped[[1, 0]]  
-G = [I, I_swapped]
-
-L = ORTH(RED(GRAN(n, n)))
-# L = np.array([[1,2],[3,1]])
-L = L / (det(L) ** (1 / n))
-
+B = ORTH(RED(GRAN(n, n)))
+B = B / (det(B) ** (1 / n))
 for t in tqdm(range(T)):
-    mu = mu0 * (v ** (-t / (T - 1)))
-
-    # print("L: ", L)
-
-    A = np.zeros((n, n))
-    for g in G: 
-        A += g@L@((g@L).T)
-    A /= len(G)
-
-    # print("A: ", A)
-
-    B = np.linalg.cholesky(A)
-    B_diff = np.zeros((n, n))
-
-    # print("B: ", B)
-
+    # mu = mu0 * (v ** (-t / (T - 1)))
+    mu = mu0
     z = URAN(n)
     y = z - CLP(B, z @ B)
     e = y @ B
     e2 = np.linalg.norm(e) ** 2
     for i in range(n):
         for j in range(i):
-            B_diff[i, j] = y[i] * e[j]
-        B_diff[i, i] = (y[i] * e[i] - e2 / (n * B[i, i]))
-
-    # print("B_diff: ", B_diff)
-
-    A_diff = chol_rev(B, B_diff) 
-
-    # print("A_diff: ", A_diff)
-    """
-    for i in range(n): 
-        for j in range(i): 
-            A_diff[j, i] = A_diff[i, j]
-    """
-
-    A_diff = np.tril(A_diff) + np.tril(A_diff, -1).T
-    # print("A_diff: ", A_diff)
-
-    L_diff = np.zeros((n, n))
-    for g in G:
-        gL_diff = A_diff @ g @ L * 2
-        L_diff += g.T @ gL_diff
-    L_diff /= len(G)
-
-    L -= mu * L_diff
-
+            B[i, j] -= mu * y[i] * e[j]
+        B[i, i] -= mu * (y[i] * e[i] - e2 / (n * B[i, i]))
     if t % Tr == Tr - 1:
-        L = ORTH(RED(L))
-        L = L / (det(L) ** (1 / n))
-
-print("L_diff: ", L_diff)
-A = np.zeros((n, n))
-for g in G: 
-    A += g@L@((g@L).T)
-A /= len(G)
-
-B = np.linalg.cholesky(A)
-B = ORTH(RED(B))
-B = B / (det(B) ** (1 / n))
+        B = ORTH(RED(B))
+        B = B / (det(B) ** (1 / n))
 
 test = 10000
 G = 0
@@ -150,7 +98,7 @@ for i in tqdm(range(test)):
     e2 = np.linalg.norm(e) ** 2
     val = 1 / n * e2
     G += val
-    sigma += val * val
+    sigma += val ** 2
 
 G = G / test
 sigma = (sigma / test - G ** 2) / (test - 1)
