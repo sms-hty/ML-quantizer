@@ -5,11 +5,14 @@ from chol_diff import chol_rev
 
 def ORTH(B):
     return np.linalg.cholesky(B @ B.T)
-
 def URAN(n):
     return np.random.randn(n)
 def GRAN(n, m):
     return np.random.normal(size = (n, m))
+
+# def URAN_TEST(n): 
+#     return np.array([0.342,0.46556,0.8])
+
 def CLP(G, r):
     n = G.shape[0]
     C = np.float64("inf")
@@ -63,60 +66,46 @@ def det(B):
     return res
 
 
-Tr = 1
-T = Tr * 1000000
-mu0 = 0.001
+Tr = 100
+T = Tr * 1000
+mu0 = 0.1
 v = 500
-n = 2
+n = 10
 
 I = np.eye(n)
 I_swapped = I.copy() 
 I_swapped[[0, 1]] = I_swapped[[1, 0]]  
-G = [I, I_swapped]
+G = [I]
 
 L = ORTH(RED(GRAN(n, n)))
-# L = np.array([[1,2],[3,1]])
+# L = np.array([[1,3,5],[2,4,3],[6,6,6]], dtype = float)
+# L = ORTH(RED(L))
 L = L / (det(L) ** (1 / n))
 
 for t in tqdm(range(T)):
     mu = mu0 * (v ** (-t / (T - 1)))
-
-    # print("L: ", L)
+    # mu = 0.1
 
     A = np.zeros((n, n))
     for g in G: 
         A += g@L@((g@L).T)
     A /= len(G)
 
-    # print("A: ", A)
-
     B = np.linalg.cholesky(A)
     B_diff = np.zeros((n, n))
-
-    # print("B: ", B)
 
     z = URAN(n)
     y = z - CLP(B, z @ B)
     e = y @ B
     e2 = np.linalg.norm(e) ** 2
+
     for i in range(n):
         for j in range(i):
             B_diff[i, j] = y[i] * e[j]
         B_diff[i, i] = (y[i] * e[i] - e2 / (n * B[i, i]))
 
-    # print("B_diff: ", B_diff)
-
     A_diff = chol_rev(B, B_diff) 
-
-    # print("A_diff: ", A_diff)
-    """
-    for i in range(n): 
-        for j in range(i): 
-            A_diff[j, i] = A_diff[i, j]
-    """
-
-    A_diff = np.tril(A_diff) + np.tril(A_diff, -1).T
-    # print("A_diff: ", A_diff)
+    A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
 
     L_diff = np.zeros((n, n))
     for g in G:
@@ -124,13 +113,18 @@ for t in tqdm(range(T)):
         L_diff += g.T @ gL_diff
     L_diff /= len(G)
 
+    # print(B_diff)
+    # print(A_diff)
+    # print(L_diff)
+
     L -= mu * L_diff
 
     if t % Tr == Tr - 1:
         L = ORTH(RED(L))
         L = L / (det(L) ** (1 / n))
 
-print("L_diff: ", L_diff)
+
+
 A = np.zeros((n, n))
 for g in G: 
     A += g@L@((g@L).T)
@@ -140,7 +134,7 @@ B = np.linalg.cholesky(A)
 B = ORTH(RED(B))
 B = B / (det(B) ** (1 / n))
 
-test = 10000
+test = 100000
 G = 0
 sigma = 0
 for i in tqdm(range(test)):
