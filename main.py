@@ -4,8 +4,6 @@ from lll import LLL_reduction as RED
 
 from chol_diff import chol_rev
 
-# test for Wangzt
-
 
 def ORTH(B):
 	return np.linalg.cholesky(B @ B.T)
