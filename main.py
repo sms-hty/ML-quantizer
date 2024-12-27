@@ -4,9 +4,11 @@ from lll import LLL_reduction as RED
 
 from chol_diff import chol_rev
 
+from numpy import linalg as la
+
 
 def ORTH(B):
-	return np.linalg.cholesky(B @ B.T)
+	return la.cholesky(B @ B.T)
 
 
 def URAN(n):
@@ -20,6 +22,8 @@ def GRAN(n, m):
 
 # def URAN_TEST(n):
 #     return np.array([0.342,0.46556,0.8])
+
+# TODO: let CLP support parallel computation and batch processing
 
 
 def CLP(G, r):
@@ -71,10 +75,11 @@ def CLP(G, r):
 
 
 def det(B):
-	res = 1
-	for i in range(n):
-		res = res * B[i, i]
-	return res
+	# res = 1
+	# for i in range(n):
+	# 	res = res * B[i, i]
+	# return res
+	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
 
 Tr = 100
@@ -88,41 +93,54 @@ I_swapped = I.copy()
 I_swapped[[0, 1]] = I_swapped[[1, 0]]
 # G = [I]
 G = [np.diag([1, 1]), np.diag([-1, 1]), np.diag([1, -1]), np.diag([-1, -1])]
+G = np.array(G)
 L = ORTH(RED(GRAN(n, n)))
 # L = np.array([[1,3,5],[2,4,3],[6,6,6]], dtype = float)
 # L = ORTH(RED(L))
 L = L / (det(L)**(1 / n))
 
+# TODO: Class implementations for optimizer and schedulers
+
 for t in tqdm(range(T)):
 	mu = mu0 * (v**(-t / (T - 1)))
 	# mu = 0.1
 
-	A = np.zeros((n, n))
-	for g in G:
-		A += g @ L @ ((g @ L).T)
-	A /= len(G)
+	A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
+	                                                   -2)),
+	            axis=0)
+	# A = np.zeros((n, n))
+	# for g in G:
+	# 	A += g @ L @ ((g @ L).T)
+	# A /= len(G)
 
-	B = np.linalg.cholesky(A)
+	B = la.cholesky(A)
 	B_diff = np.zeros((n, n))
 
 	z = URAN(n)
 	y = z - CLP(B, z @ B)
 	e = y @ B
-	e2 = np.linalg.norm(e)**2
+	e2 = la.vector_norm(e, axis=-1)**2
 
-	for i in range(n):
-		for j in range(i):
-			B_diff[i, j] = y[i] * e[j]
-		B_diff[i, i] = (y[i] * e[i] - e2 / (n * B[i, i]))
+	# for i in range(n):
+	# 	for j in range(i):
+	# 		B_diff[i, j] = y[i] * e[j]
+	# 	B_diff[i, i] = (y[i] * e[i] - e2 / (n * B[i, i]))
+
+	B_diff = np.tril(np.outer(y, e))
+	B_diff[np.diag_indices(n)] -= e2 / (n * np.diag(B))
 
 	A_diff = chol_rev(B, B_diff)
 	A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
 
-	L_diff = np.zeros((n, n))
-	for g in G:
-		gL_diff = A_diff @ g @ L * 2
-		L_diff += g.T @ gL_diff
-	L_diff /= len(G)
+	# L_diff = np.zeros((n, n))
+	# for g in G:
+	# 	gL_diff = A_diff @ g @ L * 2
+	# 	L_diff += g.T @ gL_diff
+	# L_diff /= len(G)
+
+	L_diff = np.mean(np.matmul(np.swapaxes(G, -1, -2),
+	                           np.matmul(A_diff, np.matmul(G, L)) * 2),
+	                 axis=0)
 
 	# print(B_diff)
 	# print(A_diff)
@@ -134,12 +152,15 @@ for t in tqdm(range(T)):
 		L = ORTH(RED(L))
 		L = L / (det(L)**(1 / n))
 
-A = np.zeros((n, n))
-for g in G:
-	A += g @ L @ ((g @ L).T)
-A /= len(G)
+# A = np.zeros((n, n))
+# for g in G:
+# 	A += g @ L @ ((g @ L).T)
+# A /= len(G)
 
-B = np.linalg.cholesky(A)
+A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1, -2)),
+            axis=0)
+
+B = la.cholesky(A)
 # B = ORTH(RED(B))
 B = B / (det(B)**(1 / n))
 
@@ -150,7 +171,7 @@ for i in tqdm(range(test)):
 	z = URAN(n)
 	y = z - CLP(B, z @ B)
 	e = y @ B
-	e2 = np.linalg.norm(e)**2
+	e2 = la.norm(e)**2
 	val = 1 / n * e2
 	G += val
 	sigma += val * val
