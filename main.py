@@ -10,7 +10,8 @@ def ORTH(B):
 
 
 def URAN(n):
-	return np.random.randn(n)
+	# return np.random.randn(n)
+	return np.random.rand(n)
 
 
 def GRAN(n, m):
@@ -80,13 +81,13 @@ Tr = 100
 T = Tr * 1000
 mu0 = 0.1
 v = 500
-n = 10
+n = 2
 
 I = np.eye(n)
 I_swapped = I.copy()
 I_swapped[[0, 1]] = I_swapped[[1, 0]]
-G = [I]
-
+# G = [I]
+G = [np.diag([1, 1]), np.diag([-1, 1]), np.diag([1, -1]), np.diag([-1, -1])]
 L = ORTH(RED(GRAN(n, n)))
 # L = np.array([[1,3,5],[2,4,3],[6,6,6]], dtype = float)
 # L = ORTH(RED(L))
@@ -139,7 +140,7 @@ for g in G:
 A /= len(G)
 
 B = np.linalg.cholesky(A)
-B = ORTH(RED(B))
+# B = ORTH(RED(B))
 B = B / (det(B)**(1 / n))
 
 test = 100000
