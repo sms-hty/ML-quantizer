@@ -20,7 +20,6 @@ def ORTH(B):
 
 
 def URAN(n):
-	# return np.random.randn(n)
 	return np.random.rand(n)
 
 
@@ -166,10 +165,10 @@ def train(T, G, L, scheduler, n, batch_size):
 if __name__ == "__main__":
 
 	Tr = 100
-	T = Tr * 100
+	T = Tr * 1000
 	mu0 = 0.5
 	v = 1000
-	n = 20
+	n = 10
 	batch_size = 128
 
 	I = np.eye(n)
