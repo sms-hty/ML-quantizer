@@ -9,8 +9,6 @@ from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler
 
 np.random.seed(19260817)
 
-#TODO: Revise the algorithm and check its validity
-
 #TODO: change numpy to cupy for GPU acceleration
 
 
@@ -55,8 +53,7 @@ def CLP_single(G, r):
 			if i != 0:
 				i = i - 1
 				for j in range(d[i], i, -1):
-				 	F[j - 1, i] = F[j, i] - u[j] * G[j, i]
-				
+					F[j - 1, i] = F[j, i] - u[j] * G[j, i]
 				p[i] = F[i, i] / G[i, i]
 				u[i] = np.round(p[i])
 				y = (p[i] - u[i]) * G[i, i]
@@ -104,7 +101,7 @@ if __name__ == "__main__":
 
 	Tr = 100
 	T = Tr * 1000
-	mu0 = 0.1
+	mu0 = 0.5
 	v = 1000
 	n = 10
 	batch_size = 128
@@ -127,8 +124,8 @@ if __name__ == "__main__":
 
 	error = []
 
-	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
-	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
+	# scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
+	scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
 	for t in tqdm(range(T)):
 		# mu = mu0 * (v**(-t / (T - 1)))
@@ -165,7 +162,7 @@ if __name__ == "__main__":
 		                 axis=0)
 
 		L -= mu * L_diff
-		error.append(NSM)
+		# error.append(NSM)
 		if t % Tr == Tr - 1:
 			L = ORTH(RED(L))
 			L = L / (det(L)**(1 / n))
@@ -194,6 +191,6 @@ if __name__ == "__main__":
 	sigma = (sigma / test - G**2) / (test - 1)
 
 	print("G:", G, " sigma:", sigma)
-	# print("B: ", B)
-	plt.plot(error)
-	plt.show()
+	print("B: ", B)
+	# plt.plot(error)
+	# plt.show()
