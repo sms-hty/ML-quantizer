@@ -4,8 +4,12 @@ from lll import LLL_reduction as RED
 from chol_diff import chol_rev
 from numpy import linalg as la
 from numba import prange, jit
+import matplotlib.pyplot as plt
+from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
 
-np.random.seed(19260817)
+np.random.seed(19491001)
+
+#TODO: Revise the algorithm and check its validity
 
 #TODO: change numpy to cupy for GPU acceleration
 
@@ -31,6 +35,7 @@ def GRAN(n, m):
 #     return np.array([0.342,0.46556,0.8])
 
 # TODO: let CLP support parallel computation and batch processing
+# Done: parallel computation
 
 
 @jit(nopython=True, fastmath=True)
@@ -110,7 +115,7 @@ if __name__ == "__main__":
 	Tr = 100
 	T = Tr * 1000
 	mu0 = 0.1
-	v = 500
+	v = 100000
 	n = 10
 	batch_size = 128
 
@@ -130,10 +135,14 @@ if __name__ == "__main__":
 	# L = ORTH(RED(L))
 	L = L / (det(L)**(1 / n))
 
-	# TODO: Class implementations for optimizer and schedulers
+	error = []
+
+	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
+	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
 	for t in tqdm(range(T)):
-		mu = mu0 * (v**(-t / (T - 1)))
+		# mu = mu0 * (v**(-t / (T - 1)))
+		mu = scheduler.step()
 		# mu = 0.1
 
 		A = np.mean(np.matmul(np.matmul(G, L),
@@ -153,6 +162,8 @@ if __name__ == "__main__":
 		e = y @ B
 		e2 = la.vector_norm(e, axis=-1)**2
 
+		NSM = (det(B)**(-2 / n)) * e2 / n
+		NSM = np.mean(NSM)
 		# for i in range(n):
 		# 	for j in range(i):
 		# 		B_diff[i, j] = y[i] * e[j]
@@ -163,6 +174,7 @@ if __name__ == "__main__":
 		B_diff.transpose(1, 2, 0)[np.diag_indices(n)] -= np.outer(
 		    1 / np.diag(B), e2 / n)
 		# np.diagonal(B_diff, axis1=-2, axis2=-1) -= e2 / (n * np.diagonal(B))
+		B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
 		B_diff = np.mean(B_diff, axis=0)
 
 		A_diff = chol_rev(B, B_diff)
@@ -183,10 +195,11 @@ if __name__ == "__main__":
 		# print(L_diff)
 
 		L -= mu * L_diff
-
-		# if t % Tr == Tr - 1:
-		# 	L = ORTH(RED(L))
-		# 	L = L / (det(L)**(1 / n))
+		error.append(NSM)
+		if t % Tr == Tr - 1:
+			pass
+			# L = ORTH(RED(L))
+			# L = L / (det(L)**(1 / n))
 
 	# A = np.zeros((n, n))
 	# for g in G:
@@ -218,3 +231,5 @@ if __name__ == "__main__":
 
 	print("G:", G, " sigma:", sigma)
 	print("B: ", B)
+	plt.plot(error)
+	plt.show()
