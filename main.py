@@ -9,7 +9,10 @@ from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler
 
 np.random.seed(19260817)
 
-#TODO: change numpy to cupy for GPU acceleration
+#TODO:(perhaps) change numpy to cupy for GPU acceleration
+#TODO: generate theta-image
+#TODO: design G
+#TODO: add covariance to error
 
 
 def ORTH(B):
@@ -27,13 +30,6 @@ def URAN_matrix(n, m):
 
 def GRAN(n, m):
 	return np.random.normal(size=(n, m))
-
-
-# def URAN_TEST(n):
-#     return np.array([0.342,0.46556,0.8])
-
-# TODO: let CLP support parallel computation and batch processing
-# Done: parallel computation
 
 
 @jit(nopython=True, fastmath=True)
@@ -150,8 +146,6 @@ def reduce_L(L):
 
 def train(T, G, L, scheduler, n, batch_size):
 
-	# error = []
-
 	for t in tqdm(range(T)):
 		mu = scheduler.step()
 
@@ -190,58 +184,10 @@ if __name__ == "__main__":
 	# ]
 	G = np.array(G)
 	L = ORTH(RED(GRAN(n, n)))
-	# L = np.array([[1,3,5],[2,4,3],[6,6,6]], dtype = float)
-	# L = ORTH(RED(L))
 	L = L / (det(L)**(1 / n))
-
-	# error = []
 
 	# scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
 	scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
-
-	# for t in tqdm(range(T)):
-	# 	# mu = mu0 * (v**(-t / (T - 1)))
-	# 	mu = scheduler.step()
-
-	# 	# A = np.mean(np.matmul(np.matmul(G, L),
-	# 	#                       np.swapaxes(np.matmul(G, L), -1, -2)),
-	# 	#             axis=0)
-
-	# 	# B = la.cholesky(A)
-	# 	B = calc_B(G, L)
-
-	# 	# z = URAN_matrix(batch_size, n)
-	# 	# y = z - CLP(B, z @ B)
-	# 	# e = y @ B
-	# 	# e2 = la.norm(e, axis=-1)**2
-
-	# 	# NSM = (det(B)**(-2 / n)) * e2 / n
-	# 	# NSM = np.mean(NSM)
-
-	# 	y, e, e2, NSM = calc_NSM(B, batch_size, n)
-
-	# 	# B_diff = np.tril(np.outer(y, e))
-	# 	# B_diff = np.tril(np.einsum('ij,ik->ijk', y, e))
-	# 	# B_diff.transpose(1, 2, 0)[np.diag_indices(n)] -= np.outer(
-	# 	#     1 / np.diag(B), e2 / n)
-	# 	# # np.diagonal(B_diff, axis1=-2, axis2=-1) -= e2 / (n * np.diagonal(B))
-	# 	# B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
-	# 	# B_diff = np.mean(B_diff, axis=0)
-	# 	# B_diff = calc_B_diff(y, e, e2, B, n)
-
-	# 	# A_diff = chol_rev(B, B_diff)
-	# 	# A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
-
-	# 	# L_diff = np.mean(np.matmul(np.swapaxes(G, -1, -2),
-	# 	#                            np.matmul(A_diff, np.matmul(G, L)) * 2),
-	# 	#                  axis=0)
-	# 	L_diff = calc_diff(y, e, e2, G, L, B, n)
-
-	# 	L -= mu * L_diff
-	# 	# error.append(NSM)
-	# 	if t % Tr == Tr - 1:
-	# 		L = ORTH(RED(L))
-	# 		L = L / (det(L)**(1 / n))
 
 	L = train(T, G, L, scheduler, n, batch_size)
 
@@ -250,7 +196,6 @@ if __name__ == "__main__":
 	            axis=0)
 
 	B = la.cholesky(A)
-	# B = ORTH(RED(B))
 	B = B / (det(B)**(1 / n))
 
 	test = 10000
@@ -271,5 +216,3 @@ if __name__ == "__main__":
 	print("G:", G, " sigma:", sigma)
 
 	# print("B: ", B)
-	# plt.plot(error)
-	# plt.show()
