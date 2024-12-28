@@ -110,7 +110,7 @@ if __name__ == "__main__":
 	Tr = 100
 	T = Tr * 1000
 	mu0 = 0.1
-	v = 1000
+	v = 500
 	n = 10
 	batch_size = 128
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 	# B = ORTH(RED(B))
 	B = B / (det(B)**(1 / n))
 
-	test = 100
+	test = 100000
 	G = 0
 	sigma = 0
 	for i in tqdm(range(test)):
