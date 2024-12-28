@@ -54,13 +54,6 @@ def CLP_single(G, r):
 				i = i - 1
 				for j in range(d[i], i, -1):
 					F[j - 1, i] = F[j, i] - u[j] * G[j, i]
-
-				# idx = np.arange(d[i], i, -1)
-				# F[idx - 1, i] = F[idx, i] - u[idx] * G[idx, i]
-
-				# F[i:d[i],
-				#   i] = F[(i + 1):(d[i] + 1),
-				#          i] - u[(i + 1):(d[i] + 1)] * G[(i + 1):(d[i] + 1), i]
 				p[i] = F[i, i] / G[i, i]
 				u[i] = np.round(p[i])
 				y = (p[i] - u[i]) * G[i, i]
@@ -83,8 +76,7 @@ def CLP_single(G, r):
 				Lambda[i] = Lambda[i + 1] + y**2
 			if Lambda[i] < C:
 				break
-		# for j in range(m, i):
-		# 	d[j] = i
+
 		d[m:i] = i
 		for j in range(m - 1, -1, -1):
 			if d[j] < i:
@@ -102,10 +94,6 @@ def CLP(G, r_batch):
 
 
 def det(B):
-	# res = 1
-	# for i in range(n):
-	# 	res = res * B[i, i]
-	# return res
 	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
 
@@ -142,68 +130,42 @@ if __name__ == "__main__":
 	for t in tqdm(range(T)):
 		# mu = mu0 * (v**(-t / (T - 1)))
 		mu = scheduler.step()
-		# mu = 0.1
 
 		A = np.mean(np.matmul(np.matmul(G, L),
 		                      np.swapaxes(np.matmul(G, L), -1, -2)),
 		            axis=0)
-		# A = np.zeros((n, n))
-		# for g in G:
-		# 	A += g @ L @ ((g @ L).T)
-		# A /= len(G)
 
 		B = la.cholesky(A)
 		B_diff = np.zeros((n, n))
 
-		# z = URAN(n)
 		z = URAN_matrix(batch_size, n)
 		y = z - CLP(B, z @ B)
 		e = y @ B
-		e2 = la.vector_norm(e, axis=-1)**2
+		e2 = la.norm(e, axis=-1)**2
 
 		NSM = (det(B)**(-2 / n)) * e2 / n
 		NSM = np.mean(NSM)
-		# for i in range(n):
-		# 	for j in range(i):
-		# 		B_diff[i, j] = y[i] * e[j]
-		# 	B_diff[i, i] = (y[i] * e[i] - e2 / (n * B[i, i]))
 
 		# B_diff = np.tril(np.outer(y, e))
 		B_diff = np.tril(np.einsum('ij,ik->ijk', y, e))
 		B_diff.transpose(1, 2, 0)[np.diag_indices(n)] -= np.outer(
 		    1 / np.diag(B), e2 / n)
 		# np.diagonal(B_diff, axis1=-2, axis2=-1) -= e2 / (n * np.diagonal(B))
-		B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
+		# B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
 		B_diff = np.mean(B_diff, axis=0)
 
 		A_diff = chol_rev(B, B_diff)
 		A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
 
-		# L_diff = np.zeros((n, n))
-		# for g in G:
-		# 	gL_diff = A_diff @ g @ L * 2
-		# 	L_diff += g.T @ gL_diff
-		# L_diff /= len(G)
-
 		L_diff = np.mean(np.matmul(np.swapaxes(G, -1, -2),
 		                           np.matmul(A_diff, np.matmul(G, L)) * 2),
 		                 axis=0)
 
-		# print(B_diff)
-		# print(A_diff)
-		# print(L_diff)
-
 		L -= mu * L_diff
 		# error.append(NSM)
 		if t % Tr == Tr - 1:
-			pass
-			# L = ORTH(RED(L))
-			# L = L / (det(L)**(1 / n))
-
-	# A = np.zeros((n, n))
-	# for g in G:
-	# 	A += g @ L @ ((g @ L).T)
-	# A /= len(G)
+			L = ORTH(RED(L))
+			L = L / (det(L)**(1 / n))
 
 	A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
 	                                                   -2)),
