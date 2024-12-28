@@ -7,9 +7,7 @@ from numba import prange, jit
 import matplotlib.pyplot as plt
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
 
-np.random.seed(19491001)
-
-#TODO: Revise the algorithm and check its validity
+np.random.seed(19260817)
 
 #TODO: change numpy to cupy for GPU acceleration
 
@@ -54,14 +52,15 @@ def CLP_single(G, r):
 		while True:
 			if i != 0:
 				i = i - 1
-				# for j in range(d[i], i, -1):
-				# 	F[j - 1, i] = F[j, i] - u[j] * G[j, i]
+				for j in range(d[i], i, -1):
+					F[j - 1, i] = F[j, i] - u[j] * G[j, i]
 
 				# idx = np.arange(d[i], i, -1)
 				# F[idx - 1, i] = F[idx, i] - u[idx] * G[idx, i]
-				F[i:d[i],
-				  i] = F[(i + 1):(d[i] + 1),
-				         i] - u[(i + 1):(d[i] + 1)] * G[(i + 1):(d[i] + 1), i]
+
+				# F[i:d[i],
+				#   i] = F[(i + 1):(d[i] + 1),
+				#          i] - u[(i + 1):(d[i] + 1)] * G[(i + 1):(d[i] + 1), i]
 				p[i] = F[i, i] / G[i, i]
 				u[i] = np.round(p[i])
 				y = (p[i] - u[i]) * G[i, i]
@@ -114,8 +113,8 @@ if __name__ == "__main__":
 
 	Tr = 100
 	T = Tr * 1000
-	mu0 = 0.1
-	v = 100000
+	mu0 = 0.5
+	v = 1000
 	n = 10
 	batch_size = 128
 
@@ -137,8 +136,8 @@ if __name__ == "__main__":
 
 	error = []
 
-	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
-	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
+	# scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
+	scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
 	for t in tqdm(range(T)):
 		# mu = mu0 * (v**(-t / (T - 1)))
@@ -195,7 +194,7 @@ if __name__ == "__main__":
 		# print(L_diff)
 
 		L -= mu * L_diff
-		error.append(NSM)
+		# error.append(NSM)
 		if t % Tr == Tr - 1:
 			pass
 			# L = ORTH(RED(L))
@@ -231,5 +230,5 @@ if __name__ == "__main__":
 
 	print("G:", G, " sigma:", sigma)
 	print("B: ", B)
-	plt.plot(error)
-	plt.show()
+	# plt.plot(error)
+	# plt.show()
