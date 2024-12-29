@@ -2,34 +2,40 @@ import numpy as np
 from tqdm import tqdm
 from lll import LLL_reduction as RED
 from chol_diff import chol_rev
+from numpy import linalg as la
+from numba import prange, jit
+import matplotlib.pyplot as plt
 import torch
+from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
 
-torch.set_default_dtype(torch.float64)
+np.random.seed(19260817)
+
+#TODO:(perhaps) change numpy to cupy for GPU acceleration
+#TODO: generate theta-image
+#TODO: design G
+#TODO: add covariance to error
 
 
 def ORTH(B):
-	return torch.linalg.cholesky(B @ B.T)
+	return la.cholesky(B @ B.T)
 
 
 def URAN(n):
-	# return torch.randn(n)
-	return torch.rand(n)
+	return np.random.rand(n)
+
+
+def URAN_matrix(n, m):
+	return np.random.rand(n, m)
 
 
 def GRAN(n, m):
-	return torch.randn((n, m))
+	return np.random.normal(size=(n, m))
 
 
-# def URAN_TEST(n):
-#     return torch.tensor([0.342,0.46556,0.8])
-
-
-def CLP(GG, rr):
-	G = GG.numpy()
-	r = rr.numpy()
-
+@jit(nopython=True, fastmath=True)
+def CLP_single(G, r):
 	n = G.shape[0]
-	C = np.float64("inf")
+	C = np.inf
 	i = n
 	d = np.array([n - 1] * n)
 	Lambda = np.zeros(n + 1)
@@ -57,8 +63,7 @@ def CLP(GG, rr):
 		m = i
 		while True:
 			if i == n - 1:
-				ret = torch.from_numpy(uu)
-				return ret
+				return uu
 			else:
 				i = i + 1
 				u[i] = u[i] + Delta[i]
@@ -67,8 +72,8 @@ def CLP(GG, rr):
 				Lambda[i] = Lambda[i + 1] + y**2
 			if Lambda[i] < C:
 				break
-		for j in range(m, i):
-			d[j] = i
+
+		d[m:i] = i
 		for j in range(m - 1, -1, -1):
 			if d[j] < i:
 				d[j] = i
@@ -76,87 +81,116 @@ def CLP(GG, rr):
 				break
 
 
-def mydet(B):
-	# res = 1
-	# for i in range(n):
-	# 	res = res * B[i, i]
-	res = torch.prod(torch.diag(B))
+@jit(nopython=True, parallel=True, fastmath=True)
+def CLP(G, r_batch):
+	res = np.zeros_like(r_batch)
+	for i in prange(r_batch.shape[0]):
+		res[i] = CLP_single(G, r_batch[i])
 	return res
 
 
-Tr = 100
-T = Tr * 1000
-mu0 = 0.1
-v = 50
-n = 2
+def det(B):
+	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
-I = np.eye(n)
-I_swapped = I.copy()
-I_swapped[[0, 1]] = I_swapped[[1, 0]]
-# G = [I]
-G = [np.diag([1, 1]), np.diag([-1, 1]), np.diag([1, -1]), np.diag([-1, -1])]
-torch_G = torch.tensor(np.array(G)).to(torch.float64)
 
-L = ORTH(RED(GRAN(n, n)))
-# L = ORTH(RED(torch.tensor([[1,3,5],[2,4,3],[6,6,6]]).float()))
-L = L / (torch.linalg.det(L)**(1 / n))
-L.requires_grad_()
-optimizer = torch.optim.SGD([L], lr=mu0)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, Tr, 500**(-Tr / T))
+def calc_B(G, L):
+	return la.cholesky(
+	    np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
+	                                                   -2)),
+	            axis=0))
 
-for t in tqdm(range(T)):
-	# mu = mu0 * (v**(-t / (T - 1)))
-	# mu = 0.1
 
-	# L.requires_grad_()
-	optimizer.zero_grad()
+def calc_NSM(B_t, batch_size, n):
+	B = B_t.detach().numpy()
+	z = URAN_matrix(batch_size, n)
+	y = z - CLP(B, z @ B)
+	e = torch.tensor(y) @ B_t
+	e2 = torch.norm(e, dim=-1) ** 2
 
-	A = torch.mean(torch.matmul(torch_G, L).matmul(
-	    torch.permute(torch.matmul(torch_G, L), (0, 2, 1))),
-	               dim=0)
+	NSM = (torch.prod(torch.diagonal(B_t))**(-2 / n)) * e2 / n
+	return torch.mean(NSM)
 
-	B = torch.linalg.cholesky(A)
 
-	with torch.no_grad():
-		z = URAN(n)
-		y = z - CLP(B, z @ B)
-	e = torch.matmul(y, B)
-	V = mydet(B)
+def reduce_L(L):
+	L = ORTH(RED(L))
+	L = L / (det(L)**(1 / n))
+	return L
 
-	e2 = torch.linalg.vector_norm(e, dim=-1)**2
-	NSM = (V**(-2 / n)) * e2 / n
 
-	NSM.backward()
-	optimizer.step()
-	scheduler.step()
-	if t % Tr == Tr - 1:
-		with torch.no_grad():
-			L.data = ORTH(RED(L.data))
-			L.data = L.data / (torch.linalg.det(L.data)**(1 / n))
-		# L.requires_grad_()
+def train(T, G, L, scheduler, n, batch_size):
+	
+	G = torch.tensor(G)
 
-with torch.no_grad():
-	A = torch.mean(torch.matmul(torch_G, L).matmul(
-	    torch.permute(torch.matmul(torch_G, L), (0, 2, 1))),
-	               dim=0)
-	B = torch.linalg.cholesky(A)
-	# B = ORTH(RED(B))
-	B = B / (mydet(B)**(1 / n))
+	for t in tqdm(range(T)):
+		mu = scheduler.step()
 
-	test = 1000
+		leaf_L = torch.tensor(L, requires_grad = True)
+		B_t = torch.linalg.cholesky(
+	    torch.mean((G @ leaf_L) @ (G @ leaf_L).transpose(-1, -2),
+	            dim=0))
+
+		NSM = calc_NSM(B_t, batch_size, n)
+
+		NSM.backward()
+
+		L -= mu * leaf_L.grad.numpy()
+
+		if t % Tr == Tr - 1:
+			L = reduce_L(L)
+
+	return L
+
+
+if __name__ == "__main__":
+
+	Tr = 100
+	T = Tr * 1000
+	mu0 = 0.5
+	v = 1000
+	n = 10
+	batch_size = 128
+
+	I = np.eye(n)
+	I_swapped = I.copy()
+	I_swapped[[0, 1]] = I_swapped[[1, 0]]
+	G = [I]
+	# G = [
+	#     np.diag([1, 1]),
+	#     np.diag([-1, 1]),
+	#     np.diag([1, -1]),
+	#     np.diag([-1, -1])
+	# ]
+	G = np.array(G)
+	L = ORTH(RED(GRAN(n, n)))
+	L = L / (det(L)**(1 / n))
+
+	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
+	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
+
+	L = train(T, G, L, scheduler, n, batch_size)
+
+	A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
+	                                                   -2)),
+	            axis=0)
+
+	B = la.cholesky(A)
+	B = B / (det(B)**(1 / n))
+
+	test = 100000
 	G = 0
 	sigma = 0
 	for i in tqdm(range(test)):
-		z = URAN(n)
+		z = URAN_matrix(1, n)
 		y = z - CLP(B, z @ B)
-		e = torch.matmul(y, B)
-		e2 = torch.linalg.vector_norm(e, dim=-1)**2
+		e = y @ B
+		e2 = la.norm(e)**2
 		val = 1 / n * e2
 		G += val
 		sigma += val * val
 
 	G = G / test
-	sigma_squared = (sigma / test - G**2) / (test - 1)
+	sigma = (sigma / test - G**2) / (test - 1)
 
-	print("G:", G, " sigma:", sigma_squared)
-	print("B: ", B)
+	print("G:", G, " sigma:", sigma)
+
+	# print("B: ", B)
