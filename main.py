@@ -9,7 +9,10 @@ from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler
 
 np.random.seed(19260817)
 
-#TODO: change numpy to cupy for GPU acceleration
+#TODO:(perhaps) change numpy to cupy for GPU acceleration
+#TODO: generate theta-image
+#TODO: design G
+#TODO: add covariance to error
 
 
 def ORTH(B):
@@ -17,7 +20,6 @@ def ORTH(B):
 
 
 def URAN(n):
-	# return np.random.randn(n)
 	return np.random.rand(n)
 
 
@@ -27,13 +29,6 @@ def URAN_matrix(n, m):
 
 def GRAN(n, m):
 	return np.random.normal(size=(n, m))
-
-
-# def URAN_TEST(n):
-#     return np.array([0.342,0.46556,0.8])
-
-# TODO: let CLP support parallel computation and batch processing
-# Done: parallel computation
 
 
 @jit(nopython=True, fastmath=True)
@@ -97,6 +92,76 @@ def det(B):
 	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
 
+def calc_B(G, L):
+	return la.cholesky(
+	    np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
+	                                                   -2)),
+	            axis=0))
+
+
+def calc_NSM(B, batch_size, n):
+	z = URAN_matrix(batch_size, n)
+	y = z - CLP(B, z @ B)
+	e = y @ B
+	e2 = la.norm(e, axis=-1)**2
+
+	NSM = (det(B)**(-2 / n)) * e2 / n
+	return y, e, e2, np.mean(NSM)
+
+
+def calc_B_diff(y, e, e2, B, n):
+	B_diff = np.tril(np.einsum('ij,ik->ijk', y, e))
+	B_diff.transpose(1, 2, 0)[np.diag_indices(n)] -= np.outer(
+	    1 / np.diag(B), e2 / n)
+	B_diff = np.mean(B_diff, axis=0)
+	B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
+	return B_diff
+
+
+def calc_A_diff(B, B_diff):
+	A_diff = chol_rev(B, B_diff)
+	A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
+	return A_diff
+
+
+def calc_L_diff(G, A_diff, L):
+	return np.mean(np.matmul(np.swapaxes(G, -1, -2),
+	                         np.matmul(A_diff, np.matmul(G, L)) * 2),
+	               axis=0)
+
+
+def calc_diff(y, e, e2, G, L, B, n):
+	B_diff = calc_B_diff(y, e, e2, B, n)
+	A_diff = calc_A_diff(B, B_diff)
+	L_diff = calc_L_diff(G, A_diff, L)
+	return L_diff
+
+
+def reduce_L(L):
+	L = ORTH(RED(L))
+	L = L / (det(L)**(1 / n))
+	return L
+
+
+def train(T, G, L, scheduler, n, batch_size):
+
+	for t in tqdm(range(T)):
+		mu = scheduler.step()
+
+		B = calc_B(G, L)
+
+		y, e, e2, NSM = calc_NSM(B, batch_size, n)
+
+		L_diff = calc_diff(y, e, e2, G, L, B, n)
+
+		L -= mu * L_diff
+
+		if t % Tr == Tr - 1:
+			L = reduce_L(L)
+
+	return L
+
+
 if __name__ == "__main__":
 
 	Tr = 100
@@ -118,64 +183,21 @@ if __name__ == "__main__":
 	# ]
 	G = np.array(G)
 	L = ORTH(RED(GRAN(n, n)))
-	# L = np.array([[1,3,5],[2,4,3],[6,6,6]], dtype = float)
-	# L = ORTH(RED(L))
 	L = L / (det(L)**(1 / n))
-
-	error = []
 
 	# scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
 	scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
-	for t in tqdm(range(T)):
-		# mu = mu0 * (v**(-t / (T - 1)))
-		mu = scheduler.step()
-
-		A = np.mean(np.matmul(np.matmul(G, L),
-		                      np.swapaxes(np.matmul(G, L), -1, -2)),
-		            axis=0)
-
-		B = la.cholesky(A)
-		B_diff = np.zeros((n, n))
-
-		z = URAN_matrix(batch_size, n)
-		y = z - CLP(B, z @ B)
-		e = y @ B
-		e2 = la.norm(e, axis=-1)**2
-
-		NSM = (det(B)**(-2 / n)) * e2 / n
-		NSM = np.mean(NSM)
-
-		# B_diff = np.tril(np.outer(y, e))
-		B_diff = np.tril(np.einsum('ij,ik->ijk', y, e))
-		B_diff.transpose(1, 2, 0)[np.diag_indices(n)] -= np.outer(
-		    1 / np.diag(B), e2 / n)
-		# np.diagonal(B_diff, axis1=-2, axis2=-1) -= e2 / (n * np.diagonal(B))
-		# B_diff = B_diff * 2 * (det(B)**(-2 / n)) / n
-		B_diff = np.mean(B_diff, axis=0)
-
-		A_diff = chol_rev(B, B_diff)
-		A_diff = (np.tril(A_diff) + np.tril(A_diff).T) / n
-
-		L_diff = np.mean(np.matmul(np.swapaxes(G, -1, -2),
-		                           np.matmul(A_diff, np.matmul(G, L)) * 2),
-		                 axis=0)
-
-		L -= mu * L_diff
-		# error.append(NSM)
-		if t % Tr == Tr - 1:
-			L = ORTH(RED(L))
-			L = L / (det(L)**(1 / n))
+	L = train(T, G, L, scheduler, n, batch_size)
 
 	A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
 	                                                   -2)),
 	            axis=0)
 
 	B = la.cholesky(A)
-	# B = ORTH(RED(B))
 	B = B / (det(B)**(1 / n))
 
-	test = 100000
+	test = 10000
 	G = 0
 	sigma = 0
 	for i in tqdm(range(test)):
@@ -191,6 +213,5 @@ if __name__ == "__main__":
 	sigma = (sigma / test - G**2) / (test - 1)
 
 	print("G:", G, " sigma:", sigma)
-	print("B: ", B)
-	# plt.plot(error)
-	# plt.show()
+
+	# print("B: ", B)
