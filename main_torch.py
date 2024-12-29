@@ -12,18 +12,9 @@ import time
 np.random.seed(19260817)
 
 #TODO:(perhaps) change numpy to cupy for GPU acceleration
-#TODO: generate theta-image
-#Done
 #TODO: design G
 #TODO: add covariance to error
 
-
-
-def calc_B(G, L):
-	return la.cholesky(
-	    np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
-	                                                   -2)),
-	            axis=0))
 
 
 def calc_NSM(B_t, batch_size, n):

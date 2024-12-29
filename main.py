@@ -12,7 +12,6 @@ import time
 np.random.seed(19260817)
 
 #TODO:(perhaps) change numpy to cupy for GPU acceleration
-#TODO: generate theta-image
 #TODO: design G
 #TODO: add covariance to error
 
