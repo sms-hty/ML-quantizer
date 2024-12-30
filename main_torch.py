@@ -8,6 +8,7 @@ import torch
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
 from util import ORTH, URAN_matrix, GRAN, CLP, det, grader
 import time
+import os
 
 np.random.seed(19260817)
 
@@ -16,13 +17,12 @@ np.random.seed(19260817)
 #TODO: add covariance to error
 
 
-
 def calc_NSM(B_t, batch_size, n):
 	B = B_t.detach().numpy()
 	z = URAN_matrix(batch_size, n)
 	y = z - CLP(B, z @ B)
 	e = torch.tensor(y) @ B_t
-	e2 = torch.norm(e, dim=-1) ** 2
+	e2 = torch.norm(e, dim=-1)**2
 
 	NSM = (torch.prod(torch.diagonal(B_t))**(-2 / n)) * e2 / n
 	return torch.mean(NSM)
@@ -35,16 +35,15 @@ def reduce_L(L):
 
 
 def train(T, G, L, scheduler, n, batch_size):
-	
+
 	G = torch.tensor(G)
 
 	for t in tqdm(range(T)):
 		mu = scheduler.step()
 
-		leaf_L = torch.tensor(L, requires_grad = True)
+		leaf_L = torch.tensor(L, requires_grad=True)
 		B_t = torch.linalg.cholesky(
-	    torch.mean((G @ leaf_L) @ (G @ leaf_L).transpose(-1, -2),
-	            dim=0))
+		    torch.mean((G @ leaf_L) @ (G @ leaf_L).transpose(-1, -2), dim=0))
 
 		NSM = calc_NSM(B_t, batch_size, n)
 
@@ -93,8 +92,24 @@ if __name__ == "__main__":
 	B = la.cholesky(A)
 	B = B / (det(B)**(1 / n))
 
-	grader(B)
+	NSM, sigma_squared = grader(B)
+	sigma = np.sqrt(sigma_squared)
+	data = {
+	    'B': B,
+	    'NSM': NSM,
+	    'G': G,
+	    'sigma': sigma,
+	    'n': n,
+	    'batch_size': batch_size,
+	    'T': T,
+	    'mu0': mu0
+	}
+	save_path = f"./data/{n}_dim/"
+	if not os.path.exists(save_path):
+		os.makedirs(save_path)
 
 	# print("B: ", B)
 
-	np.save("B"+time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), B)
+	np.savez(
+	    save_path + "B" + time.strftime("%Y%m%d-%H-%M-%S", time.localtime()),
+	    **data)

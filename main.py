@@ -6,8 +6,9 @@ from numpy import linalg as la
 from numba import prange, jit
 import matplotlib.pyplot as plt
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
-from util import ORTH, URAN_matrix, GRAN, CLP, det, grader
+from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, theta_image
 import time
+import os
 
 np.random.seed(19260817)
 
@@ -109,8 +110,8 @@ if __name__ == "__main__":
 	L = ORTH(RED(GRAN(n, n)))
 	L = L / (det(L)**(1 / n))
 
-	# scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
-	scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
+	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
+	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
 	L = train(T, G, L, scheduler, n, batch_size)
 
@@ -121,8 +122,26 @@ if __name__ == "__main__":
 	B = la.cholesky(A)
 	B = B / (det(B)**(1 / n))
 
-	grader(B)
+	NSM, sigma_squared = grader(B)
+	sigma = np.sqrt(sigma_squared)
+	data = {
+	    'B': B,
+	    'NSM': NSM,
+	    'G': G,
+	    'sigma': sigma,
+	    'n': n,
+	    'batch_size': batch_size,
+	    'T': T,
+	    'mu0': mu0
+	}
+	save_path = f"./data/{n}_dim/"
+	if not os.path.exists(save_path):
+		os.makedirs(save_path)
 
 	# print("B: ", B)
 
-	np.save("B"+time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), B)
+	np.savez(
+	    save_path + "B" + time.strftime("%Y%m%d-%H-%M-%S", time.localtime()),
+	    **data)
+
+	theta_image(B)
