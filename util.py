@@ -77,20 +77,21 @@ def det(B):
 	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
 
-def grader(B, test = 100000):
+def grader(B, test = 100000, batchsize = 2024):
     n = B.shape[0]
     G = 0
     sigma = 0
     for i in tqdm(range(test)):
-        z = URAN_matrix(1, n)
+        z = URAN_matrix(batchsize, n)
         y = z - CLP(B, z @ B)
         e = y @ B
-        e2 = la.norm(e)**2
+        e2 = la.norm(e, axis = -1) ** 2
         val = 1 / n * e2
-        G += val
-        sigma += val * val
-    G = G / test
-    sigma = (sigma / test - G**2) / (test - 1)
+        G += val.sum()
+        sigma += (val ** 2).sum()
+    T = test * batchsize
+    G = G / T
+    sigma = math.sqrt((sigma / T - G ** 2) / (T - 1))
     print(G, sigma)
     return (G, sigma)
 

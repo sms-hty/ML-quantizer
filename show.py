@@ -9,5 +9,6 @@ args = parser.parse_args()
 file_path = args.file_path
 
 B = np.load(file_path)['B']
+# print(B)
 grader(B)
 theta_image(B)
