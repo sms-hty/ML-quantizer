@@ -109,8 +109,8 @@ def theta_image(B, UP = 5):
         # |now[dep] + i * B[dep][dep]| <= sqrt(UP - sum)
         # -now[dep] - sqrt(UP - sum) <= i * B[dep][dep] <= -now[dep] + sqrt(UP - sum)
         
-        l = math.ceil(-nowvec[dep] - math.sqrt(UP - sum))
-        r = math.floor(-nowvec[dep] + math.sqrt(UP - sum))
+        l = math.ceil((-nowvec[dep] - math.sqrt(UP - sum)) / B[dep, dep])
+        r = math.floor((-nowvec[dep] + math.sqrt(UP - sum)) / B[dep, dep])
         
         for i in range(l, r + 1):
             newvec = nowvec + i * B[dep]
