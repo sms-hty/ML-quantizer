@@ -77,7 +77,7 @@ def det(B):
 	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
 
 
-def grader(B, test = 100000, batchsize = 2024):
+def grader(B, test = 100000, batchsize = 128):
     n = B.shape[0]
     G = 0
     sigma = 0
