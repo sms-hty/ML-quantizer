@@ -105,8 +105,9 @@ class Theta_Image_Drawer:
 		self.ax.set_ylabel('N(B,r)')
 		self.ax.set_yscale('log')
 		self.ax.grid(True)
-
-	def add(self, B, label = None, style = None):
+	def __deinit__(self):
+		self.fig.close()
+	def add(self, B, label = None, style = {}):
 		n = B.shape[0]
 		data = []
 		def dfs(dep, sum, nowvec):
@@ -157,3 +158,26 @@ def theta_image(B, path = None):
 	A = Theta_Image_Drawer()
 	A.add(B)
 	A.show(path = path)
+
+class Loss_Drawer:
+	def __init__(self, start):
+		self.start = start
+		self.cnt = 0
+		self.fig, self.ax = plt.subplots(figsize=(8, 6))
+		self.ax.set_xlabel('cnt')
+		self.ax.set_ylabel('loss')
+		self.ax.grid(True)
+		self.loss = []
+	def __deinit__(self):
+		self.fig.close()
+	def add(self, val):
+		self.cnt += 1
+		if self.cnt > self.start:
+			self.loss.append(val)
+	def show(self, path = None):
+		self.ax.plot(np.arange(len(self.loss)) + self.start, self.loss)
+		self.ax.legend()
+		if path == None:
+			self.fig.show()
+		else:
+			self.fig.savefig(path)
