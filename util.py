@@ -95,9 +95,9 @@ def grader(B, test = 100000, batchsize = 128):
     print(G, sigma)
     return (G, sigma)
 
-def theta_image(B, UP = 5):
+
+def theta_image_add(B, UP = 5, label = None):
     n = B.shape[0]
-    UP = 5
     data = []
     def dfs(dep, sum, nowvec):
         if sum > UP:
@@ -117,16 +117,20 @@ def theta_image(B, UP = 5):
             dfs(dep - 1, sum + newvec[dep] ** 2, newvec)
 
     dfs(n - 1, 0, np.zeros(n))
-
     sorted_data = list(np.sort(data))
     cdf = [i for i in range(1, len(sorted_data) + 1)]
     cdf.append(len(sorted_data))
     sorted_data.append(UP)
     plt.figure(figsize=(8, 6))
-    plt.step(sorted_data, cdf, where='post', linestyle='-', markersize=0)
+    plt.step(sorted_data, cdf, where='post', linestyle='-', markersize=0, label = label)
     plt.xlabel('r^2')
     plt.xlim(0, UP)
+
+def theta_image_show(path = None):
     plt.ylabel('N(B,r)')
     plt.yscale('log')
     plt.grid(True)
-    plt.show()
+    if path == None:
+        plt.show()
+    else:
+        plt.savefig(path)
