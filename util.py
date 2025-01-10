@@ -95,38 +95,65 @@ def grader(B, test = 100000, batchsize = 128):
     print(G, sigma)
     return (G, sigma)
 
-def theta_image(B, UP = 5):
-    n = B.shape[0]
-    UP = 5
-    data = []
-    def dfs(dep, sum, nowvec):
-        if sum > UP:
-            return
-        if dep == -1:
-            data.append(sum)
-            return
-        # sum + (now[dep] + i * B[dep][dep]) ** 2 <= UP
-        # |now[dep] + i * B[dep][dep]| <= sqrt(UP - sum)
-        # -now[dep] - sqrt(UP - sum) <= i * B[dep][dep] <= -now[dep] + sqrt(UP - sum)
-        
-        l = math.ceil((-nowvec[dep] - math.sqrt(UP - sum)) / B[dep, dep])
-        r = math.floor((-nowvec[dep] + math.sqrt(UP - sum)) / B[dep, dep])
-        
-        for i in range(l, r + 1):
-            newvec = nowvec + i * B[dep]
-            dfs(dep - 1, sum + newvec[dep] ** 2, newvec)
+class Theta_Image_Drawer:
 
-    dfs(n - 1, 0, np.zeros(n))
+	def __init__(self, UP = 5):
+		self.fig, self.ax = plt.subplots(figsize=(8, 6))
+		self.UP = UP
+		self.ax.set_xlabel('r^2')
+		self.ax.set_xlim(0, UP)
+		self.ax.set_ylabel('N(B,r)')
+		self.ax.set_yscale('log')
+		self.ax.grid(True)
 
-    sorted_data = list(np.sort(data))
-    cdf = [i for i in range(1, len(sorted_data) + 1)]
-    cdf.append(len(sorted_data))
-    sorted_data.append(UP)
-    plt.figure(figsize=(8, 6))
-    plt.step(sorted_data, cdf, where='post', linestyle='-', markersize=0)
-    plt.xlabel('r^2')
-    plt.xlim(0, UP)
-    plt.ylabel('N(B,r)')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show()
+	def add(self, B, label = None, style = None):
+		n = B.shape[0]
+		data = []
+		def dfs(dep, sum, nowvec):
+			if sum > self.UP:
+				return
+			if dep == -1:
+				data.append(sum)
+				return
+			# sum + (now[dep] + i * B[dep][dep]) ** 2 <= UP
+			# |now[dep] + i * B[dep][dep]| <= sqrt(UP - sum)
+			# -now[dep] - sqrt(UP - sum) <= i * B[dep][dep] <= -now[dep] + sqrt(UP - sum)
+			
+			l = math.ceil((-nowvec[dep] - math.sqrt(self.UP - sum)) / B[dep, dep])
+			r = math.floor((-nowvec[dep] + math.sqrt(self.UP - sum)) / B[dep, dep])
+			
+			for i in range(l, r + 1):
+				newvec = nowvec + i * B[dep]
+				dfs(dep - 1, sum + newvec[dep] ** 2, newvec)
+
+		dfs(n - 1, 0, np.zeros(n))
+		sorted_data = list(np.sort(data))
+		cdf = [i for i in range(1, len(sorted_data) + 1)]
+		cdf.append(len(sorted_data))
+		sorted_data.append(self.UP)
+		if "linestyle" in style:
+			linestyle = style["linestyle"]
+		else:
+			linestyle = ""
+		if "alpha" in style:
+			alpha = style["alpha"]
+		else:
+			alpha = 1
+		if "color" in style:
+			color = style["color"]
+		else:
+			color = "blue"
+		self.ax.step(sorted_data, cdf, where = 'post', linestyle = linestyle, color = color, 
+			alpha = alpha, markersize = 0, label = label)
+
+	def show(self, path = None):
+		self.ax.legend()
+		if path == None:
+			self.fig.show()
+		else:
+			self.fig.savefig(path)
+
+def theta_image(B, path = None):
+	A = Theta_Image_Drawer()
+	A.add(B)
+	A.show(path = path)

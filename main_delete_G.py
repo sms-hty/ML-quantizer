@@ -6,7 +6,7 @@ from numpy import linalg as la
 from numba import prange, jit
 import matplotlib.pyplot as plt
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
-from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, theta_image
+from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, Theta_Image_Drawer
 import time
 import os
 
@@ -41,11 +41,14 @@ def reduce_B(B):
 	return B
 
 
-def train(T, mask, B, scheduler, n, batch_size):
+def train(T, mask, B, scheduler, n, batch_size, checkpoint, drawer):
 
 	for t in tqdm(range(T)):
 		mu = scheduler.step()
 
+		if t in checkpoint:
+			drawer.add(B, label = str(t), style = checkpoint[t])
+		
 		y, e, e2, NSM = calc_NSM(B, batch_size, n)
 
 		B_diff = calc_B_diff(y, e, e2, B, n)
@@ -54,7 +57,9 @@ def train(T, mask, B, scheduler, n, batch_size):
 
 		if t % Tr == Tr - 1:
 			B = reduce_B(B)
-
+	
+	if T in checkpoint:
+		drawer.add(B, label = str(T), style = checkpoint[T])
 	return B
 
 def initB(n):
@@ -68,13 +73,13 @@ def initmask(n):
 	mask = np.zeros((n,n))
 	for i in range(n):
 		for j in range(i + 1):
-			if i < 12 or j >= 12:
+			if True:
 				mask[i, j] = 1
 	return mask
 
 if __name__ == "__main__":
 	Tr = 100
-	T = Tr * 400
+	T = Tr * 1000
 	mu0 = 0.5
 	v = 1000
 	n = 13
@@ -87,7 +92,18 @@ if __name__ == "__main__":
 	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
 	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
-	B = train(T, mask, B, scheduler, n, batch_size)
+	checkpoint = {
+		0: {"linestyle": '--', "alpha": 0.5},
+		0.001 * T: {"linestyle": '--', "alpha": 0.6},
+		0.003 * T: {"linestyle": '--', "alpha": 0.7},
+		0.01 * T: {"linestyle": '--', "alpha": 0.8},
+		0.1 * T: {"linestyle": '--', "alpha": 0.9},
+		T: {"linestyle": '-', "alpha": 1},
+	}
+
+	drawer = Theta_Image_Drawer()
+
+	B = train(T, mask, B, scheduler, n, batch_size, checkpoint, drawer)
 
 	B = B / (det(B)**(1 / n))
 
@@ -110,7 +126,12 @@ if __name__ == "__main__":
 	save_path = f"./data/{n}_dim/"
 	if not os.path.exists(save_path):
 		os.makedirs(save_path)
+	
+	filename = time.strftime("%Y%m%d-%H-%M-%S", time.localtime())
+	
+	if checkpoint != None:
+		drawer.show(path = save_path + filename + ".svg")
 
 	np.savez(
-	    save_path + "B" + time.strftime("%Y%m%d-%H-%M-%S", time.localtime()),
+	    save_path + "B" + filename,
 	    **data)
