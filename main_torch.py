@@ -6,7 +6,7 @@ from numpy import linalg as la
 import matplotlib.pyplot as plt
 import torch
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
-from util import ORTH, URAN_matrix, GRAN, CLP, det, grader
+from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, Theta_Image_Drawer
 import time
 import os
 
@@ -34,7 +34,7 @@ def reduce_L(L):
 	return L
 
 
-def train(T, G, L, scheduler, n, batch_size):
+def train(T, G, L, scheduler, n, batch_size, checkpoint, drawer):
 
 	G = torch.tensor(G)
 
@@ -45,6 +45,9 @@ def train(T, G, L, scheduler, n, batch_size):
 		B_t = torch.linalg.cholesky(
 		    torch.mean((G @ leaf_L) @ (G @ leaf_L).transpose(-1, -2), dim=0))
 
+		if t in checkpoint:
+			drawer.add(B_t.detach().numpy(), label = str(t), style = checkpoint[t])
+
 		NSM = calc_NSM(B_t, batch_size, n)
 
 		NSM.backward()
@@ -53,7 +56,14 @@ def train(T, G, L, scheduler, n, batch_size):
 
 		if t % Tr == Tr - 1:
 			L = reduce_L(L)
-
+	
+	if T in checkpoint:
+		B = la.cholesky(np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
+	                                                   -2)),
+	            axis=0))
+		B = B / (det(B) ** (1 / n))
+		B = calc_B(G, L, n, m)
+		drawer.add(B, label = str(T), style = checkpoint[T])
 	return L
 
 
@@ -63,13 +73,13 @@ if __name__ == "__main__":
 	T = Tr * 1000
 	mu0 = 0.5
 	v = 1000
-	n = 10
+	n = 13
 	batch_size = 128
 
 	I = np.eye(n)
-	I_swapped = I.copy()
-	I_swapped[[0, 1]] = I_swapped[[1, 0]]
-	G = [I]
+	I_13 = I.copy()
+	I_13[12, 12] = -1
+	G = [I, I_13]
 	# G = [
 	#     np.diag([1, 1]),
 	#     np.diag([-1, 1]),
@@ -82,8 +92,18 @@ if __name__ == "__main__":
 
 	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
 	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
+	checkpoint = {
+		0: {"linestyle": '--', "alpha": 0.5},
+		0.001 * T: {"linestyle": '--', "alpha": 0.6},
+		0.003 * T: {"linestyle": '--', "alpha": 0.7},
+		0.01 * T: {"linestyle": '--', "alpha": 0.8},
+		0.1 * T: {"linestyle": '--', "alpha": 0.9},
+		T: {"linestyle": '-', "alpha": 1},
+	}
 
-	L = train(T, G, L, scheduler, n, batch_size)
+	drawer = Theta_Image_Drawer()
+
+	L = train(T, G, L, scheduler, n, batch_size, checkpoint, drawer)
 
 	A = np.mean(np.matmul(np.matmul(G, L), np.swapaxes(np.matmul(G, L), -1,
 	                                                   -2)),
@@ -110,6 +130,11 @@ if __name__ == "__main__":
 
 	# print("B: ", B)
 
+	filename = time.strftime("%Y%m%d-%H-%M-%S", time.localtime())
+	
+	if checkpoint != None:
+		drawer.show(path = save_path + filename + ".svg")
+
 	np.savez(
-	    save_path + "B" + time.strftime("%Y%m%d-%H-%M-%S", time.localtime()),
+	    save_path + "B" + filename,
 	    **data)

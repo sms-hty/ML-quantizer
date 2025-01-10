@@ -1,4 +1,4 @@
-from util import grader, theta_image_add, theta_image_show
+from util import grader, theta_image
 import numpy as np
 import argparse
 
@@ -11,5 +11,4 @@ file_path = args.file_path
 B = np.load(file_path)['B']
 # print(B)
 grader(B)
-theta_image_add(B)
-theta_image_show()
+theta_image(B, path = "tmp.png")

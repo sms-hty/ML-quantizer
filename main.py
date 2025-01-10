@@ -6,7 +6,7 @@ from numpy import linalg as la
 from numba import prange, jit
 import matplotlib.pyplot as plt
 from schedulers import CosineAnnealingRestartLRScheduler, ExponentialLRScheduler, StepLRScheduler
-from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, theta_image
+from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, Theta_Image_Drawer
 import time
 import os
 
@@ -65,12 +65,15 @@ def reduce_L(L):
 	return L
 
 
-def train(T, G, L, scheduler, n, m, batch_size):
+def train(T, G, L, scheduler, n, m, batch_size, checkpoint, drawer):
 
 	for t in tqdm(range(T)):
 		mu = scheduler.step()
 
 		B = calc_B(G, L, n, m)
+
+		if t in checkpoint:
+			drawer.add(B, label = str(t), style = checkpoint[t])
 
 		y, e, e2, NSM = calc_NSM(B, batch_size, n)
 
@@ -80,7 +83,9 @@ def train(T, G, L, scheduler, n, m, batch_size):
 
 		if t % Tr == Tr - 1:
 			L = reduce_L(L)
-
+	if T in checkpoint:
+		B = calc_B(G, L, n, m)
+		drawer.add(B, label = str(T), style = checkpoint[T])
 	return L
 
 
@@ -89,12 +94,14 @@ if __name__ == "__main__":
 	T = Tr * 1000
 	mu0 = 0.5
 	v = 1000
-	n = 10
-	m = 10  # restrictions only on first m vectors 
+	n = 13
+	m = 13  # restrictions only on first m vectors 
 	batch_size = 128
 
 	I = np.eye(m)
-	G = [I]  # array of m*m matrices
+	I_13 = I.copy()
+	I_13[12, 12] = -1
+	G = [I, I_13]  # array of m*m matrices
 	"""
 	G = [
 		np.array([[1,0],[0,1]]),
@@ -118,7 +125,18 @@ if __name__ == "__main__":
 	scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
 	# scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
 
-	L = train(T, G, L, scheduler, n, m, batch_size)
+	checkpoint = {
+		0: {"linestyle": '--', "alpha": 0.5},
+		0.001 * T: {"linestyle": '--', "alpha": 0.6},
+		0.003 * T: {"linestyle": '--', "alpha": 0.7},
+		0.01 * T: {"linestyle": '--', "alpha": 0.8},
+		0.1 * T: {"linestyle": '--', "alpha": 0.9},
+		T: {"linestyle": '-', "alpha": 1},
+	}
+
+	drawer = Theta_Image_Drawer()
+
+	L = train(T, G, L, scheduler, n, m, batch_size, checkpoint, drawer)
 
 	B = calc_B(G, L, n, m)
 	B = ORTH(RED(B))
@@ -143,9 +161,12 @@ if __name__ == "__main__":
 	np.set_printoptions(suppress=True)
 	np.set_printoptions(precision=4)
 	print("B: ", B)
+	
+	filename = time.strftime("%Y%m%d-%H-%M-%S", time.localtime())
+	
+	if checkpoint != None:
+		drawer.show(path = save_path + filename + ".svg")
 
 	np.savez(
-	    save_path + "B" + time.strftime("%Y%m%d-%H-%M-%S", time.localtime()),
+	    save_path + "B" + filename,
 	    **data)
-
-	theta_image(B)
