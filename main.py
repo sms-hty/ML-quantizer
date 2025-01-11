@@ -60,8 +60,8 @@ def calc_diff(y, e, e2, G, L, B, n, m):
 
 
 def reduce_L(L):
-    L = ORTH(RED(L))
-    L = L / (det(L)**(1 / n))
+    #L = ORTH(RED(L))
+    L = L / (np.abs(det(L))**(1 / n))
     return L
 
 
@@ -123,8 +123,8 @@ if __name__ == "__main__":
     ]
     """
     G = np.array(G)
-    L = ORTH(RED(GRAN(n, n)))
-    L = L / (det(L)**(1 / n))
+    L = GRAN(n, n)
+    L = L / (np.abs(det(L))**(1 / n))
 
     # scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
     scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))

@@ -73,9 +73,7 @@ def CLP(G, r_batch):
 		res[i] = CLP_single(G, r_batch[i])
 	return res
 
-def det(B):
-	return np.prod(np.diagonal(B, axis1=-2, axis2=-1), axis=-1)
-
+det = la.det
 
 def grader(B, test = 100000, batchsize = 128):
     n = B.shape[0]

@@ -10,7 +10,7 @@ from util import ORTH, URAN_matrix, GRAN, CLP, det, grader, Theta_Image_Drawer, 
 import time
 import os
 
-np.random.seed(114514)
+np.random.seed(1919810)
 
 #TODO:(perhaps) change numpy to cupy for GPU acceleration
 #TODO: design G
@@ -63,8 +63,8 @@ def calc_diff(y, e, e2, G, L, B, n):
 
 
 def reduce_L(L, n):
-    L = ORTH(RED(L))
-    L = L / (det(L)**(1 / n))
+    # L = ORTH(RED(L))
+    L = L / (np.abs(det(L)) ** (1 / n))
     return L
 
 def train(T, Tr, G, L, scheduler, n, batch_size, checkpoint, theta_image_drawer, loss_drawer):
@@ -108,10 +108,10 @@ def solve(n, m):
     I2 = np.eye(n)
     for i in range(0,n - m):
         I2[i,i] = -1
-    G = [I,I2]
+    G = [I, I2]
     G = np.array(G)
-    L = ORTH(RED(GRAN(n, n)))
-    L = L / (det(L)**(1 / n))
+    L = GRAN(n, n)
+    L = L / (np.abs(det(L))**(1 / n))
 
     # scheduler = CosineAnnealingRestartLRScheduler(initial_lr=mu0)
     scheduler = ExponentialLRScheduler(initial_lr=mu0, gamma=v**(-1 / T))
@@ -168,6 +168,7 @@ def solve(n, m):
     # theta_image(B)
 
 if __name__ == "__main__":
-    for i in range(2,17):
-        for j in range(0,i//2+1):
-            solve(i,j)
+    solve(12, 6)
+    #for i in range(2,17):
+    #    for j in range(0,i//2+1):
+    #        solve(i,j)

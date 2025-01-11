@@ -114,7 +114,7 @@ def solve(n):
     }
 
     theta_image_drawer = Theta_Image_Drawer()
-    loss_drawer = Loss_Drawer(start = T / Tr * 0.1)
+    loss_drawer = Loss_Drawer(start = T / Tr * 0.01)
 
     B = train(T, Tr, mask, B, scheduler, n, batch_size, checkpoint, theta_image_drawer, loss_drawer)
 
@@ -152,5 +152,4 @@ def solve(n):
         **data)
 
 if __name__ == "__main__":
-    for i in range(2,17):
-        solve(i)
+    solve(23)
